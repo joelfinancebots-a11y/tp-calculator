@@ -4,12 +4,15 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Take Profits Calculator</title>
+
+  <!-- PWA setup -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <meta name="theme-color" content="#12161c" />
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"/>
   <style>
-    :root{
-      --card-bg: var(--pico-card-background-color, #12161c);
-      --muted: var(--pico-muted-color);
-    }
+    :root{ --card-bg: var(--pico-card-background-color, #12161c); --muted: var(--pico-muted-color); }
     body { max-width: 1100px; margin: auto; padding: 1.5rem; }
     header h1 { margin: 0 0 .25rem 0 }
     .inputs { display:grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap:.75rem }
@@ -18,7 +21,7 @@
     .tp-block { border:1px solid var(--pico-muted-border-color,#2b3d50); border-radius:10px; padding:.75rem; background: var(--card-bg); }
     .tp-block hgroup h4 { margin:0; font-size:1rem }
     .tp-block hgroup p { margin:.2rem 0 .6rem 0; font-size:.9rem; color:var(--muted) }
-    .tp-block input { padding:.55rem .7rem; } /* smaller inputs (≈1/3 down from original) */
+    .tp-block input { padding:.55rem .7rem; }
     .hint { color: var(--muted); }
     .good { color: var(--pico-color-success); font-weight:600 }
     .bad  { color: var(--pico-color-danger);  font-weight:600 }
@@ -120,15 +123,9 @@ function renderTPs(){
 
 /* ---------- presets that follow TP count ---------- */
 const presetDefs = {
-  2: [
-    [60,20], [50,30], [40,30], [35,35], [30,30], [25,35]
-  ],
-  3: [
-    [60,20,10], [50,30,10], [40,30,20], [35,35,10], [30,30,20], [25,35,15]
-  ],
-  4: [
-    [40,30,20,10], [35,30,20,15], [30,30,20,10], [25,35,25,10], [25,30,25,20], [20,30,30,20]
-  ]
+  2: [[60,20],[50,30],[40,30],[35,35],[30,30],[25,35]],
+  3: [[60,20,10],[50,30,10],[40,30,20],[35,35,10],[30,30,20],[25,35,15]],
+  4: [[40,30,20,10],[35,30,20,15],[30,30,20,10],[25,35,25,10],[25,30,25,20],[20,30,30,20]]
 };
 
 function renderPresets(){
@@ -141,19 +138,17 @@ function renderPresets(){
     btn.className = 'secondary';
     btn.textContent = `Preset: ${arr.join(' / ')}`;
     btn.onclick = ()=>{
-      // ensure TP count matches current selection; just fill what we have
       renderTPs();
       const allocs = $$('.tp-alloc');
       const gains  = $$('.tp-gain');
       for (let i=0;i<allocs.length;i++){
         allocs[i].value = arr[i] ?? 0;
-        gains[i].value  = [2,4,6,8][i]; // gentle defaults
+        gains[i].value  = [2,4,6,8][i];
       }
       updateAllocMsg();
     };
     bar.appendChild(btn);
   });
-  // Append calculate at the end for convenience
   const calcBtn = document.createElement('button');
   calcBtn.id = 'calcMirror';
   calcBtn.textContent = 'Calculate';
@@ -225,7 +220,7 @@ function calculate(){
 /* ---------- scenario table (2–4 TPs) ---------- */
 function ladderRows(n){
   const rows=[];
-  for(let start=2; start<=6; start++){ // 5 rows total
+  for(let start=2; start<=6; start++){ 
     const row=[]; for(let k=0;k<n;k++) row.push(start + 2*k);
     rows.push(row);
   }
@@ -239,13 +234,11 @@ function regenGrid(){
   const n = allocs.length;
   const remainder = Math.max(0,100 - sumAlloc);
 
-  // header
   let h = '<tr>';
   for(let i=1;i<=n;i++) h += `<th>TP${i} %</th>`;
   h += `<th>Split</th><th>Net $</th><th>Net %</th></tr>`;
   gridHead.innerHTML = h;
 
-  // rows
   const ladders = ladderRows(n);
   ladders.forEach(gains=>{
     let net = 0;
@@ -279,6 +272,15 @@ renderPresets();
 updateAllocMsg();
 calculate();
 regenGrid();
+</script>
+
+<!-- Service worker registration -->
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch(console.error);
+  });
+}
 </script>
 </body>
 </html>
