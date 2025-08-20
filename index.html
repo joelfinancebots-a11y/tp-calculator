@@ -14,24 +14,14 @@
     header h1 { margin: 0 0 .25rem 0 }
     .inputs { display:grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap:.75rem }
     .toolbar { display:flex; gap:.4rem; flex-wrap:wrap; align-items:center }
-    .tp-grid { 
-      display:grid; 
-      grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); 
-      gap:.75rem; 
-      margin-top:.5rem;
-    }
-    .tp-block { 
-      border:1px solid var(--pico-muted-border-color,#2b3d50); 
-      border-radius:10px; 
-      padding:.75rem;            /* smaller padding */
-      background: var(--card-bg);
-    }
+    .tp-grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap:.75rem; margin-top:.5rem; }
+    .tp-block { border:1px solid var(--pico-muted-border-color,#2b3d50); border-radius:10px; padding:.75rem; background: var(--card-bg); }
     .tp-block hgroup h4 { margin:0; font-size:1rem }
     .tp-block hgroup p { margin:.2rem 0 .6rem 0; font-size:.9rem; color:var(--muted) }
-    .tp-block input { padding:.55rem .7rem; } /* smaller inputs */
+    .tp-block input { padding:.55rem .7rem; } /* smaller inputs (≈1/3 down from original) */
     .hint { color: var(--muted); }
     .good { color: var(--pico-color-success); font-weight:600 }
-    .bad { color: var(--pico-color-danger); font-weight:600 }
+    .bad  { color: var(--pico-color-danger);  font-weight:600 }
     table { width:100% }
     .nowrap { white-space:nowrap }
     .tight th, .tight td { padding:.45rem .6rem }
@@ -62,21 +52,17 @@
       <label class="nowrap">Quick actions</label>
     </div>
 
-    <div class="toolbar sticky-tools" style="margin:.5rem 0 0 0">
-      <button id="preset602020" class="secondary">Preset: 60 / 20 / 20</button>
-      <button id="preset503020" class="secondary">Preset: 50 / 30 / 20</button>
-      <button id="preset403030" class="secondary">Preset: 40 / 30 / 30</button>
-      <button id="preset353530" class="secondary">Preset: 35 / 35 / 30</button>
-      <button id="preset303040" class="secondary">Preset: 30 / 30 / 40</button>
-      <button id="preset253540" class="secondary">Preset: 25 / 35 / 40</button>
-      <button id="suggestBE" class="contrast">Suggest breakeven</button>
-      <button id="calculate">Calculate</button>
-    </div>
+    <!-- dynamic preset bar (changes with TP count) -->
+    <div id="presetBar" class="toolbar sticky-tools" style="margin:.5rem 0 0 0"></div>
 
     <h4 style="margin:.8rem 0 .5rem 0">Take Profit Legs</h4>
     <div id="tpContainer" class="tp-grid"></div>
 
     <p id="allocMsg" class="hint" style="margin:.25rem 0 .25rem 0"></p>
+
+    <div class="toolbar">
+      <button id="calculate">Calculate</button>
+    </div>
   </article>
 
   <article id="resultsCard" style="display:none; margin-top:.5rem">
@@ -131,7 +117,49 @@ function renderTPs(){
   for (let i=0;i<count;i++) tpContainer.appendChild(buildTP(i));
   updateAllocMsg();
 }
-numTPs.addEventListener('change', renderTPs);
+
+/* ---------- presets that follow TP count ---------- */
+const presetDefs = {
+  2: [
+    [60,20], [50,30], [40,30], [35,35], [30,30], [25,35]
+  ],
+  3: [
+    [60,20,10], [50,30,10], [40,30,20], [35,35,10], [30,30,20], [25,35,15]
+  ],
+  4: [
+    [40,30,20,10], [35,30,20,15], [30,30,20,10], [25,35,25,10], [25,30,25,20], [20,30,30,20]
+  ]
+};
+
+function renderPresets(){
+  const bar = $('#presetBar');
+  bar.innerHTML = '';
+  const n = parseInt(numTPs.value,10);
+  const defs = presetDefs[n] || [];
+  defs.forEach(arr=>{
+    const btn = document.createElement('button');
+    btn.className = 'secondary';
+    btn.textContent = `Preset: ${arr.join(' / ')}`;
+    btn.onclick = ()=>{
+      // ensure TP count matches current selection; just fill what we have
+      renderTPs();
+      const allocs = $$('.tp-alloc');
+      const gains  = $$('.tp-gain');
+      for (let i=0;i<allocs.length;i++){
+        allocs[i].value = arr[i] ?? 0;
+        gains[i].value  = [2,4,6,8][i]; // gentle defaults
+      }
+      updateAllocMsg();
+    };
+    bar.appendChild(btn);
+  });
+  // Append calculate at the end for convenience
+  const calcBtn = document.createElement('button');
+  calcBtn.id = 'calcMirror';
+  calcBtn.textContent = 'Calculate';
+  calcBtn.onclick = ()=>{ calculate(); regenGrid(); };
+  bar.appendChild(calcBtn);
+}
 
 /* ---------- read & hints ---------- */
 function readInputs(){
@@ -194,43 +222,11 @@ function calculate(){
   return {size, stop, allocs, gains, remainder, total, totalPct};
 }
 
-/* ---------- breakeven suggestion ---------- */
-/*
-  Breakeven condition (ignoring $ scale):
-    sum_i (alloc_i * target_i)  =  remainder * stop
-  If at least (n-1) targets are filled, solve for the last target.
-  Else suggest an even ladder (2,4,6,8...) scaled to satisfy BE.
-*/
-function suggestBreakeven(){
-  const {stop, allocs, gains, remainder} = readInputs();
-  const n = allocs.length;
-  const filled = gains.map((g,i)=>({i, g, has:!isNaN(g) && g>0})).filter(x=>x.has);
-
-  if (filled.length >= n-1) {
-    // solve for the last (first missing) target
-    const missIndex = gains.findIndex(g=>!(g>0));
-    const knownSum = gains.reduce((s,g,i)=> s + (g>0 ? allocs[i]*g : 0), 0);
-    const need = remainder*stop - knownSum;
-    const gNeeded = Math.max(0, need / (missIndex>=0 ? allocs[missIndex]||1 : allocs[n-1]||1));
-    const idx = (missIndex>=0 ? missIndex : n-1);
-    $$('.tp-gain')[idx].value = (Math.round(gNeeded*100)/100);
-  } else {
-    // balanced ladder suggestion
-    const base = (n===2)?[2,4] : (n===3)?[2,4,6] : [2,4,6,8];
-    const wSum = allocs.reduce((s,a,i)=> s + a*base[i], 0);
-    const scale = wSum>0 ? (remainder*stop)/wSum : 1;
-    $$('.tp-gain').forEach((inp,i)=> inp.value = (Math.round(base[i]*scale*100)/100) );
-  }
-  updateAllocMsg();
-}
-
-/* ---------- scenario grid for 2–4 TPs ---------- */
+/* ---------- scenario table (2–4 TPs) ---------- */
 function ladderRows(n){
-  // produce 5 rows of ladders: start at 2 then +1 per row, step 2 inside each ladder
   const rows=[];
-  for(let start=2; start<=6; start++){ // 2..6 inclusive (5 rows)
-    const row=[];
-    for(let k=0;k<n;k++) row.push(start + 2*k);
+  for(let start=2; start<=6; start++){ // 5 rows total
+    const row=[]; for(let k=0;k<n;k++) row.push(start + 2*k);
     rows.push(row);
   }
   return rows;
@@ -252,7 +248,6 @@ function regenGrid(){
   // rows
   const ladders = ladderRows(n);
   ladders.forEach(gains=>{
-    // compute net
     let net = 0;
     for(let i=0;i<n;i++){
       net += size*(allocs[i]/100)*(gains[i]/100);
@@ -270,34 +265,17 @@ function regenGrid(){
   });
 }
 
-/* ---------- presets ---------- */
-const setPreset = (a,b,c=0,d=0) => {
-  const useCount = (d>0)?4 : (c>0)?3 : 2;
-  numTPs.value = useCount; renderTPs();
-  const allocs = $$('.tp-alloc'); const gains = $$('.tp-gain');
-  const vals=[a,b,c,d].filter((_,i)=>i<useCount);
-  vals.forEach((v,i)=> allocs[i].value=v);
-  // Gentle defaults for gains; user can Calculate/Suggest
-  gains.forEach((g,i)=> g.value = [2,4,6,8][i]);
-  updateAllocMsg();
-};
-$('#preset602020').onclick = ()=> setPreset(60,20,20);
-$('#preset503020').onclick = ()=> setPreset(50,30,20);
-$('#preset403030').onclick = ()=> setPreset(40,30,30);
-$('#preset353530').onclick = ()=> setPreset(35,35,30);
-$('#preset303040').onclick = ()=> setPreset(30,30,40);
-$('#preset253540').onclick = ()=> setPreset(25,35,40);
-
 /* ---------- events ---------- */
 document.addEventListener('input', e=>{
   if (e.target.matches('.tp-alloc,.tp-gain,#tradeSize,#stopCap')) updateAllocMsg();
 });
 $('#calculate').onclick = ()=> { calculate(); regenGrid(); };
 $('#regenGrid').onclick  = ()=> regenGrid();
-$('#suggestBE').onclick  = ()=> { suggestBreakeven(); calculate(); };
+numTPs.addEventListener('change', ()=>{ renderTPs(); renderPresets(); });
 
 /* ---------- init ---------- */
 renderTPs();
+renderPresets();
 updateAllocMsg();
 calculate();
 regenGrid();
