@@ -6,145 +6,115 @@
   <title>Take Profits Calculator</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"/>
   <style>
-    body { max-width: 1000px; margin: auto; padding: 2rem; }
-    .inputs { display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:1rem; }
-    .tp-grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:1rem; }
-    .tp-block { border:1px solid var(--muted-border-color,#333); border-radius:10px; padding:1rem; }
-    .muted { opacity:.8 }
-    .good { color: var(--pico-color-success); font-weight:600; }
-    .bad { color: var(--pico-color-danger); font-weight:600; }
-    nav.tabs { margin-bottom:1rem }
-    .toolbar { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center }
+    :root{
+      --card-bg: var(--pico-card-background-color, #12161c);
+      --muted: var(--pico-muted-color);
+    }
+    body { max-width: 1100px; margin: auto; padding: 1.5rem; }
+    header h1 { margin: 0 0 .25rem 0 }
+    .inputs { display:grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap:.75rem }
+    .toolbar { display:flex; gap:.4rem; flex-wrap:wrap; align-items:center }
+    .tp-grid { 
+      display:grid; 
+      grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); 
+      gap:.75rem; 
+      margin-top:.5rem;
+    }
+    .tp-block { 
+      border:1px solid var(--pico-muted-border-color,#2b3d50); 
+      border-radius:10px; 
+      padding:.75rem;            /* smaller padding */
+      background: var(--card-bg);
+    }
+    .tp-block hgroup h4 { margin:0; font-size:1rem }
+    .tp-block hgroup p { margin:.2rem 0 .6rem 0; font-size:.9rem; color:var(--muted) }
+    .tp-block input { padding:.55rem .7rem; } /* smaller inputs */
+    .hint { color: var(--muted); }
+    .good { color: var(--pico-color-success); font-weight:600 }
+    .bad { color: var(--pico-color-danger); font-weight:600 }
     table { width:100% }
     .nowrap { white-space:nowrap }
+    .tight th, .tight td { padding:.45rem .6rem }
+    .sticky-tools { position: sticky; top: 0; background: transparent; padding:.25rem 0; z-index:2 }
   </style>
 </head>
 <body>
-  <nav class="tabs">
-    <ul>
-      <li><a href="#calc" data-tab class="secondary">Calculator</a></li>
-      <li><a href="#saved" data-tab>Saved</a></li>
-    </ul>
-  </nav>
-
-  <!-- CALCULATOR TAB -->
-  <section id="calc">
+  <header>
     <h1>Take Profits Calculator</h1>
-    <p class="muted">Test TP splits vs a capped stop. Mobile-friendly. No equations — just outcomes.</p>
+    <p class="hint">Test TP splits vs a capped stop. Mobile-friendly. No equations — just outcomes.</p>
+  </header>
 
-    <article>
-      <div class="inputs">
-        <label>Trade size ($)
-          <input type="number" id="tradeSize" value="1000" min="1" step="1"/>
-        </label>
-        <label>Stop loss cap (%)
-          <input type="number" id="stopCap" value="10" min="0" step="0.1"/>
-        </label>
-        <label># of Take Profits
-          <select id="numTPs">
-            <option value="2" selected>2 TPs</option>
-            <option value="3">3 TPs</option>
-            <option value="4">4 TPs</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="toolbar" style="margin-top:1rem">
-        <button id="preset602020" class="secondary">Preset: 60 / 20 / 20</button>
-        <button id="preset503020" class="secondary">Preset: 50 / 30 / 20</button>
-        <button id="preset403030" class="secondary">Preset: 40 / 30 / 30</button>
-        <button id="preset353530" class="secondary">Preset: 35 / 35 / 30</button>
-        <button id="preset303040" class="secondary">Preset: 30 / 30 / 40</button>
-        <button id="preset253540" class="secondary">Preset: 25 / 35 / 40</button>
-      </div>
-
-      <h4 style="margin-top:1rem">Take Profit Legs</h4>
-      <div id="tpContainer" class="tp-grid"></div>
-
-      <p id="allocMsg" class="muted"></p>
-
-      <footer class="toolbar" style="margin-top:.5rem">
-        <button id="calculate">Calculate</button>
-        <button id="save" class="contrast" disabled>Save outcome</button>
-      </footer>
-    </article>
-
-    <article id="resultsCard" style="display:none; margin-top:1rem">
-      <h4>Result</h4>
-      <p id="summary"></p>
-      <table>
-        <thead>
-          <tr>
-            <th>Leg</th><th>Allocation</th><th>Outcome</th><th class="nowrap">P&L ($)</th>
-          </tr>
-        </thead>
-        <tbody id="detailBody"></tbody>
-      </table>
-
-      <h4 style="margin-top:1rem">Scenario Grid (2 TPs)</h4>
-      <p class="muted">Rows are TP1/TP2 pairs: (2/4) → (8/10). Uses your split. Remainder stops at cap.</p>
-      <div class="toolbar"><button id="regenGrid" class="secondary">Regenerate grid</button></div>
-      <table>
-        <thead>
-          <tr><th>TP1 %</th><th>TP2 %</th><th>Split</th><th>Net $</th><th>Net %</th></tr>
-        </thead>
-        <tbody id="gridBody"></tbody>
-      </table>
-    </article>
-  </section>
-
-  <!-- SAVED TAB -->
-  <section id="saved" hidden>
-    <h2>Saved Outcomes</h2>
-    <p class="muted">Stored locally on this device (no server). Export to CSV/JSON anytime.</p>
-    <div class="toolbar">
-      <button id="exportCSV" class="secondary">Export CSV</button>
-      <button id="exportJSON" class="secondary">Export JSON</button>
-      <button id="clearAll" class="contrast">Clear all</button>
+  <article>
+    <div class="inputs">
+      <label>Trade size ($)
+        <input type="number" id="tradeSize" value="1000" min="1" step="1"/>
+      </label>
+      <label>Stop loss cap (%)
+        <input type="number" id="stopCap" value="10" min="0" step="0.1"/>
+      </label>
+      <label># of Take Profits
+        <select id="numTPs">
+          <option value="2" selected>2 TPs</option>
+          <option value="3">3 TPs</option>
+          <option value="4">4 TPs</option>
+        </select>
+      </label>
+      <label class="nowrap">Quick actions</label>
     </div>
-    <table style="margin-top:1rem">
+
+    <div class="toolbar sticky-tools" style="margin:.5rem 0 0 0">
+      <button id="preset602020" class="secondary">Preset: 60 / 20 / 20</button>
+      <button id="preset503020" class="secondary">Preset: 50 / 30 / 20</button>
+      <button id="preset403030" class="secondary">Preset: 40 / 30 / 30</button>
+      <button id="preset353530" class="secondary">Preset: 35 / 35 / 30</button>
+      <button id="preset303040" class="secondary">Preset: 30 / 30 / 40</button>
+      <button id="preset253540" class="secondary">Preset: 25 / 35 / 40</button>
+      <button id="suggestBE" class="contrast">Suggest breakeven</button>
+      <button id="calculate">Calculate</button>
+    </div>
+
+    <h4 style="margin:.8rem 0 .5rem 0">Take Profit Legs</h4>
+    <div id="tpContainer" class="tp-grid"></div>
+
+    <p id="allocMsg" class="hint" style="margin:.25rem 0 .25rem 0"></p>
+  </article>
+
+  <article id="resultsCard" style="display:none; margin-top:.5rem">
+    <h4>Result</h4>
+    <p id="summary"></p>
+
+    <table class="tight">
       <thead>
-        <tr>
-          <th>Date</th>
-          <th>Trade</th>
-          <th>Stop</th>
-          <th>Split</th>
-          <th>TP targets</th>
-          <th>Net $</th>
-          <th>Net %</th>
-          <th></th>
-        </tr>
+        <tr><th>Leg</th><th>Allocation</th><th>Outcome</th><th class="nowrap">P&L ($)</th></tr>
       </thead>
-      <tbody id="savedBody"></tbody>
+      <tbody id="detailBody"></tbody>
     </table>
-  </section>
+
+    <h4 style="margin-top:1rem">Scenario Table</h4>
+    <p class="hint">Auto-generates ladders up to your TP count (2–4). Uses your split; remainder exits at the stop cap.</p>
+    <div class="toolbar"><button id="regenGrid" class="secondary">Regenerate</button></div>
+    <table class="tight">
+      <thead id="gridHead"></thead>
+      <tbody id="gridBody"></tbody>
+    </table>
+  </article>
 
 <script>
 /* ---------- helpers ---------- */
-const $ = sel => document.querySelector(sel);
-const $$ = sel => [...document.querySelectorAll(sel)];
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
 const money = n => `$${(Math.round(n*100)/100).toFixed(2)}`;
 const pct   = n => `${(Math.round(n*100)/100).toFixed(2)}%`;
-
-/* ---------- tabs ---------- */
-const tabs = $$('[data-tab]');
-tabs.forEach(a => a.addEventListener('click', (e)=>{
-  e.preventDefault();
-  tabs.forEach(t=>t.classList.remove('secondary'));
-  a.classList.add('secondary');
-  const id = a.getAttribute('href');
-  ['#calc','#saved'].forEach(s => $(s).hidden = (s!==id));
-  if (id==='#saved') renderSaved();
-}));
 
 /* ---------- dynamic TP rows ---------- */
 const tpContainer = $('#tpContainer');
 const numTPs = $('#numTPs');
-function buildTP(idx, alloc= [25,35,10][idx] ?? 10, gain=[2,4,6][idx] ?? 2) {
+
+function buildTP(idx, alloc=[25,35,10,10][idx] ?? 10, gain=[2,4,6,8][idx] ?? 2) {
   const div = document.createElement('div');
   div.className = 'tp-block';
   div.innerHTML = `
-    <hgroup><h4>TP${idx+1}</h4><p class="muted">Closes a portion at TP${idx+1}.</p></hgroup>
+    <hgroup><h4>TP${idx+1}</h4><p class="hint">Closes a portion at TP${idx+1}.</p></hgroup>
     <label>Allocation (%)
       <input type="number" class="tp-alloc" value="${alloc}" min="0" step="0.5"/>
     </label>
@@ -154,6 +124,7 @@ function buildTP(idx, alloc= [25,35,10][idx] ?? 10, gain=[2,4,6][idx] ?? 2) {
   `;
   return div;
 }
+
 function renderTPs(){
   tpContainer.innerHTML = '';
   const count = parseInt(numTPs.value,10);
@@ -162,35 +133,36 @@ function renderTPs(){
 }
 numTPs.addEventListener('change', renderTPs);
 
-/* ---------- allocation hint ---------- */
+/* ---------- read & hints ---------- */
 function readInputs(){
   const size = parseFloat($('#tradeSize').value||'0');
   const stop = Math.abs(parseFloat($('#stopCap').value||'0'));
   const allocs = $$('.tp-alloc').map(x=>parseFloat(x.value||'0'));
   const gains  = $$('.tp-gain').map(x=>parseFloat(x.value||'0'));
   const sumAlloc = allocs.reduce((a,b)=>a+b,0);
-  const remainder = 100 - sumAlloc;
+  const remainder = Math.max(0, 100 - sumAlloc);
   return {size, stop, allocs, gains, sumAlloc, remainder};
 }
+
 function updateAllocMsg(){
   const {sumAlloc, remainder} = readInputs();
   const el = $('#allocMsg');
-  el.textContent = sumAlloc>100
+  el.textContent = (sumAlloc>100)
     ? `Allocations exceed 100% by ${(sumAlloc-100).toFixed(2)}%. Reduce allocations.`
-    : `Current sum = ${sumAlloc.toFixed(2)}%. Remainder = ${Math.max(0,remainder).toFixed(2)}% (stops at cap).`;
-  el.className = sumAlloc>100 ? 'bad' : 'muted';
+    : `Current sum = ${sumAlloc.toFixed(2)}%. Remainder = ${remainder.toFixed(2)}% (stops at cap).`;
+  el.className = (sumAlloc>100)?'bad':'hint';
 }
 
 /* ---------- calculation ---------- */
 const resultsCard = $('#resultsCard');
 const summaryEl = $('#summary');
 const detailBody = $('#detailBody');
+const gridHead = $('#gridHead');
 const gridBody = $('#gridBody');
-const saveBtn = $('#save');
 
 function calculate(){
   const {size, stop, allocs, gains, sumAlloc, remainder} = readInputs();
-  if(size<=0 || sumAlloc>100) { resultsCard.style.display='none'; saveBtn.disabled=true; return; }
+  if(size<=0 || sumAlloc>100){ resultsCard.style.display='none'; return null; }
 
   const legs=[]; let total=0;
   allocs.forEach((a,i)=>{
@@ -199,53 +171,99 @@ function calculate(){
     legs.push({label:`TP${i+1}`, alloc:a, target:gains[i], pnl:profit});
     total += profit;
   });
-  const remAlloc = Math.max(0,remainder);
-  const stopLoss = - size*(remAlloc/100)*(stop/100);
-  legs.push({label:'Remainder', alloc:remAlloc, target:-stop, pnl:stopLoss});
+  const stopLoss = - size*(remainder/100)*(stop/100);
+  legs.push({label:'Remainder', alloc:remainder, target:-stop, pnl:stopLoss});
   total += stopLoss;
 
   const totalPct = (total/size)*100;
   summaryEl.innerHTML =
     `Net: <strong class="${total>=0?'good':'bad'}">${money(total)} (${pct(totalPct)})</strong> — ` +
-    `Trade ${money(size)}, Stop cap ${pct(stop)}.`;
+    `Trade ${money(size)}, Stop cap ${pct(stop)}, Allocated ${(sumAlloc).toFixed(2)}%, Remainder ${remainder.toFixed(2)}%.`;
 
   detailBody.innerHTML = '';
   legs.forEach(l=>{
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${l.label}</td><td>${l.alloc.toFixed(2)}%</td><td>${l.label==='Remainder' ? 'Stop ' + pct(Math.abs(l.target)) : '+' + pct(l.target)}</td>
+    tr.innerHTML = `<td>${l.label}</td>
+                    <td>${l.alloc.toFixed(2)}%</td>
+                    <td>${l.label==='Remainder' ? 'Stop ' + pct(Math.abs(l.target)) : '+' + pct(l.target)}</td>
                     <td class="${l.pnl>=0?'good':'bad'}">${money(l.pnl)}</td>`;
     detailBody.appendChild(tr);
   });
 
   resultsCard.style.display='block';
-  saveBtn.disabled=false;
+  return {size, stop, allocs, gains, remainder, total, totalPct};
+}
 
-  // refresh scenario grid if 2 TPs
-  regenGrid();
-  // return a data blob for saving
-  const split = allocs.join('/') + `/${Math.max(0,100-sumAlloc).toFixed(2)}`;
-  return { ts: Date.now(), size, stop, allocs, gains, remainder: Math.max(0,100-sumAlloc), legs, total, totalPct, split };
+/* ---------- breakeven suggestion ---------- */
+/*
+  Breakeven condition (ignoring $ scale):
+    sum_i (alloc_i * target_i)  =  remainder * stop
+  If at least (n-1) targets are filled, solve for the last target.
+  Else suggest an even ladder (2,4,6,8...) scaled to satisfy BE.
+*/
+function suggestBreakeven(){
+  const {stop, allocs, gains, remainder} = readInputs();
+  const n = allocs.length;
+  const filled = gains.map((g,i)=>({i, g, has:!isNaN(g) && g>0})).filter(x=>x.has);
+
+  if (filled.length >= n-1) {
+    // solve for the last (first missing) target
+    const missIndex = gains.findIndex(g=>!(g>0));
+    const knownSum = gains.reduce((s,g,i)=> s + (g>0 ? allocs[i]*g : 0), 0);
+    const need = remainder*stop - knownSum;
+    const gNeeded = Math.max(0, need / (missIndex>=0 ? allocs[missIndex]||1 : allocs[n-1]||1));
+    const idx = (missIndex>=0 ? missIndex : n-1);
+    $$('.tp-gain')[idx].value = (Math.round(gNeeded*100)/100);
+  } else {
+    // balanced ladder suggestion
+    const base = (n===2)?[2,4] : (n===3)?[2,4,6] : [2,4,6,8];
+    const wSum = allocs.reduce((s,a,i)=> s + a*base[i], 0);
+    const scale = wSum>0 ? (remainder*stop)/wSum : 1;
+    $$('.tp-gain').forEach((inp,i)=> inp.value = (Math.round(base[i]*scale*100)/100) );
+  }
+  updateAllocMsg();
+}
+
+/* ---------- scenario grid for 2–4 TPs ---------- */
+function ladderRows(n){
+  // produce 5 rows of ladders: start at 2 then +1 per row, step 2 inside each ladder
+  const rows=[];
+  for(let start=2; start<=6; start++){ // 2..6 inclusive (5 rows)
+    const row=[];
+    for(let k=0;k<n;k++) row.push(start + 2*k);
+    rows.push(row);
+  }
+  return rows;
 }
 
 function regenGrid(){
   const {size, stop, allocs, sumAlloc} = readInputs();
-  gridBody.innerHTML='';
-  if (allocs.length!==2){
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td colspan="5" class="muted">Scenario grid available for 2 TP setups only.</td>`;
-    gridBody.appendChild(tr);
-    return;
-  }
+  gridHead.innerHTML=''; gridBody.innerHTML='';
+
+  const n = allocs.length;
   const remainder = Math.max(0,100 - sumAlloc);
-  const pairs = [[2,4],[3,5],[4,6],[5,7],[6,8],[7,9],[8,10]];
-  pairs.forEach(([tp1,tp2])=>{
-    const p1 = size*(allocs[0]/100)*(tp1/100);
-    const p2 = size*(allocs[1]/100)*(tp2/100);
-    const sl = -size*(remainder/100)*(stop/100);
-    const net = p1+p2+sl; const netPct=(net/size)*100;
-    const tr=document.createElement('tr');
-    tr.innerHTML = `<td>${tp1}%</td><td>${tp2}%</td>
-      <td>${allocs[0].toFixed(0)} / ${allocs[1].toFixed(0)} / ${remainder.toFixed(0)}</td>
+
+  // header
+  let h = '<tr>';
+  for(let i=1;i<=n;i++) h += `<th>TP${i} %</th>`;
+  h += `<th>Split</th><th>Net $</th><th>Net %</th></tr>`;
+  gridHead.innerHTML = h;
+
+  // rows
+  const ladders = ladderRows(n);
+  ladders.forEach(gains=>{
+    // compute net
+    let net = 0;
+    for(let i=0;i<n;i++){
+      net += size*(allocs[i]/100)*(gains[i]/100);
+    }
+    net += - size*(remainder/100)*(stop/100);
+    const netPct = (net/size)*100;
+
+    const tr = document.createElement('tr');
+    let tds = gains.map(g=>`<td>${g}%</td>`).join('');
+    const split = allocs.map(a=>a.toFixed(0)).join(' / ') + ` / ${remainder.toFixed(0)}`;
+    tr.innerHTML = `${tds}<td>${split}</td>
       <td class="${net>=0?'good':'bad'}">${money(net)}</td>
       <td class="${net>=0?'good':'bad'}">${pct(netPct)}</td>`;
     gridBody.appendChild(tr);
@@ -253,116 +271,36 @@ function regenGrid(){
 }
 
 /* ---------- presets ---------- */
-const setPreset = (a,b) => {
-  numTPs.value = 2; renderTPs();
+const setPreset = (a,b,c=0,d=0) => {
+  const useCount = (d>0)?4 : (c>0)?3 : 2;
+  numTPs.value = useCount; renderTPs();
   const allocs = $$('.tp-alloc'); const gains = $$('.tp-gain');
-  allocs[0].value=a; allocs[1].value=b;
-  gains[0].value=2;  gains[1].value=4;
+  const vals=[a,b,c,d].filter((_,i)=>i<useCount);
+  vals.forEach((v,i)=> allocs[i].value=v);
+  // Gentle defaults for gains; user can Calculate/Suggest
+  gains.forEach((g,i)=> g.value = [2,4,6,8][i]);
   updateAllocMsg();
-}
-$('#preset602020').onclick = ()=> setPreset(60,20);
-$('#preset503020').onclick = ()=> setPreset(50,30);
-$('#preset403030').onclick = ()=> setPreset(40,30);
-$('#preset353530').onclick = ()=> setPreset(35,35);
-$('#preset303040').onclick = ()=> setPreset(30,30);
-$('#preset253540').onclick = ()=> setPreset(25,35);
-
-/* ---------- saving to localStorage ---------- */
-const KEY='tpCalcSaved';
-
-function loadSaved(){ try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return [] } }
-function saveSaved(list){ localStorage.setItem(KEY, JSON.stringify(list)); }
-
-function saveOutcome(){
-  const data = calculate(); // capture current result & ensure it’s fresh
-  if (!data) return;
-  const list = loadSaved();
-  list.unshift(data);
-  saveSaved(list);
-  // enable Saved tab view
-  renderSaved();
-  // switch to Saved tab automatically
-  document.querySelector('[href="#saved"]').click();
-}
-
-function renderSaved(){
-  const tbody = $('#savedBody');
-  const list = loadSaved();
-  tbody.innerHTML='';
-  if (!list.length){
-    const tr=document.createElement('tr');
-    tr.innerHTML = `<td colspan="8" class="muted">No saved outcomes yet.</td>`;
-    tbody.appendChild(tr);
-    return;
-  }
-  list.forEach((it,idx)=>{
-    const when = new Date(it.ts).toLocaleString();
-    const split = (it.allocs||[]).join('/') + `/${it.remainder?.toFixed(2) ?? '0'}`;
-    const targets = (it.gains||[]).join('/');
-    const tr=document.createElement('tr');
-    tr.innerHTML = `
-      <td class="nowrap">${when}</td>
-      <td>${money(it.size)}</td>
-      <td>${pct(it.stop)}</td>
-      <td>${split}</td>
-      <td>${targets}</td>
-      <td class="${it.total>=0?'good':'bad'}">${money(it.total)}</td>
-      <td class="${it.total>=0?'good':'bad'}">${pct(it.totalPct)}</td>
-      <td><button class="secondary" data-del="${idx}">Delete</button></td>`;
-    tbody.appendChild(tr);
-  });
-  // attach deletes
-  $$('button[data-del]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const list = loadSaved();
-      list.splice(parseInt(btn.dataset.del,10),1);
-      saveSaved(list); renderSaved();
-    };
-  });
-}
-
-/* ---------- exports ---------- */
-$('#exportCSV').onclick = ()=>{
-  const list = loadSaved(); if (!list.length) return;
-  const header = ['date','trade','stop','split','targets','net_dollars','net_percent'];
-  const rows = list.map(it=>[
-    new Date(it.ts).toISOString(),
-    it.size,
-    it.stop,
-    (it.allocs||[]).join('/') + `/${it.remainder?.toFixed(2)??'0'}`,
-    (it.gains||[]).join('/'),
-    it.total,
-    it.totalPct
-  ]);
-  const csv = [header, ...rows].map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob = new Blob([csv], {type:'text/csv'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='tp-saved.csv'; a.click();
 };
-
-$('#exportJSON').onclick = ()=>{
-  const list = loadSaved(); if (!list.length) return;
-  const blob = new Blob([JSON.stringify(list,null,2)], {type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='tp-saved.json'; a.click();
-};
-
-$('#clearAll').onclick = ()=>{
-  if (confirm('Delete all saved outcomes on this device?')) {
-    localStorage.removeItem(KEY); renderSaved();
-  }
-};
+$('#preset602020').onclick = ()=> setPreset(60,20,20);
+$('#preset503020').onclick = ()=> setPreset(50,30,20);
+$('#preset403030').onclick = ()=> setPreset(40,30,30);
+$('#preset353530').onclick = ()=> setPreset(35,35,30);
+$('#preset303040').onclick = ()=> setPreset(30,30,40);
+$('#preset253540').onclick = ()=> setPreset(25,35,40);
 
 /* ---------- events ---------- */
-document.addEventListener('input', (e)=>{
+document.addEventListener('input', e=>{
   if (e.target.matches('.tp-alloc,.tp-gain,#tradeSize,#stopCap')) updateAllocMsg();
 });
-$('#calculate').onclick = ()=> calculate();
+$('#calculate').onclick = ()=> { calculate(); regenGrid(); };
 $('#regenGrid').onclick  = ()=> regenGrid();
-$('#save').onclick       = ()=> saveOutcome();
+$('#suggestBE').onclick  = ()=> { suggestBreakeven(); calculate(); };
 
 /* ---------- init ---------- */
 renderTPs();
 updateAllocMsg();
 calculate();
+regenGrid();
 </script>
 </body>
 </html>
