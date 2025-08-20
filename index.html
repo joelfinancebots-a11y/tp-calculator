@@ -1,78 +1,368 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Take Profits Calculator</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"/>
   <style>
-    body { max-width: 800px; margin: auto; padding: 2rem; }
-    .inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
-    .tp-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1rem; }
-    .tp-block { border: 1px solid #333; border-radius: 8px; padding: 1rem; background: #1a1a1a; }
-    .tp-block h4 { margin: 0 0 .5rem 0; font-size: 1rem; }
-    .result { margin-top: 2rem; font-weight: bold; }
+    body { max-width: 1000px; margin: auto; padding: 2rem; }
+    .inputs { display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:1rem; }
+    .tp-grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:1rem; }
+    .tp-block { border:1px solid var(--muted-border-color,#333); border-radius:10px; padding:1rem; }
+    .muted { opacity:.8 }
+    .good { color: var(--pico-color-success); font-weight:600; }
+    .bad { color: var(--pico-color-danger); font-weight:600; }
+    nav.tabs { margin-bottom:1rem }
+    .toolbar { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center }
+    table { width:100% }
+    .nowrap { white-space:nowrap }
   </style>
 </head>
 <body>
-  <h1>Take Profits Calculator</h1>
-  <p>Quickly test TP splits vs a capped stop. Mobile-friendly. No equations — just outcomes.</p>
+  <nav class="tabs">
+    <ul>
+      <li><a href="#calc" data-tab class="secondary">Calculator</a></li>
+      <li><a href="#saved" data-tab>Saved</a></li>
+    </ul>
+  </nav>
 
-  <form id="tp-form">
-    <div class="inputs">
-      <label>Trade size ($)<input type="number" id="tradeSize" value="200"/></label>
-      <label>Stop loss cap (%)<input type="number" id="stopCap" value="6"/></label>
-      <label># of Take Profits
-        <select id="numTPs">
-          <option value="1">1 TP</option>
-          <option value="2">2 TPs</option>
-          <option value="3" selected>3 TPs</option>
-        </select>
-      </label>
+  <!-- CALCULATOR TAB -->
+  <section id="calc">
+    <h1>Take Profits Calculator</h1>
+    <p class="muted">Test TP splits vs a capped stop. Mobile-friendly. No equations — just outcomes.</p>
+
+    <article>
+      <div class="inputs">
+        <label>Trade size ($)
+          <input type="number" id="tradeSize" value="1000" min="1" step="1"/>
+        </label>
+        <label>Stop loss cap (%)
+          <input type="number" id="stopCap" value="10" min="0" step="0.1"/>
+        </label>
+        <label># of Take Profits
+          <select id="numTPs">
+            <option value="2" selected>2 TPs</option>
+            <option value="3">3 TPs</option>
+            <option value="4">4 TPs</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="toolbar" style="margin-top:1rem">
+        <button id="preset602020" class="secondary">Preset: 60 / 20 / 20</button>
+        <button id="preset503020" class="secondary">Preset: 50 / 30 / 20</button>
+        <button id="preset403030" class="secondary">Preset: 40 / 30 / 30</button>
+        <button id="preset353530" class="secondary">Preset: 35 / 35 / 30</button>
+        <button id="preset303040" class="secondary">Preset: 30 / 30 / 40</button>
+        <button id="preset253540" class="secondary">Preset: 25 / 35 / 40</button>
+      </div>
+
+      <h4 style="margin-top:1rem">Take Profit Legs</h4>
+      <div id="tpContainer" class="tp-grid"></div>
+
+      <p id="allocMsg" class="muted"></p>
+
+      <footer class="toolbar" style="margin-top:.5rem">
+        <button id="calculate">Calculate</button>
+        <button id="save" class="contrast" disabled>Save outcome</button>
+      </footer>
+    </article>
+
+    <article id="resultsCard" style="display:none; margin-top:1rem">
+      <h4>Result</h4>
+      <p id="summary"></p>
+      <table>
+        <thead>
+          <tr>
+            <th>Leg</th><th>Allocation</th><th>Outcome</th><th class="nowrap">P&L ($)</th>
+          </tr>
+        </thead>
+        <tbody id="detailBody"></tbody>
+      </table>
+
+      <h4 style="margin-top:1rem">Scenario Grid (2 TPs)</h4>
+      <p class="muted">Rows are TP1/TP2 pairs: (2/4) → (8/10). Uses your split. Remainder stops at cap.</p>
+      <div class="toolbar"><button id="regenGrid" class="secondary">Regenerate grid</button></div>
+      <table>
+        <thead>
+          <tr><th>TP1 %</th><th>TP2 %</th><th>Split</th><th>Net $</th><th>Net %</th></tr>
+        </thead>
+        <tbody id="gridBody"></tbody>
+      </table>
+    </article>
+  </section>
+
+  <!-- SAVED TAB -->
+  <section id="saved" hidden>
+    <h2>Saved Outcomes</h2>
+    <p class="muted">Stored locally on this device (no server). Export to CSV/JSON anytime.</p>
+    <div class="toolbar">
+      <button id="exportCSV" class="secondary">Export CSV</button>
+      <button id="exportJSON" class="secondary">Export JSON</button>
+      <button id="clearAll" class="contrast">Clear all</button>
     </div>
-    <button type="button" id="calculate">Calculate</button>
-  </form>
+    <table style="margin-top:1rem">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Trade</th>
+          <th>Stop</th>
+          <th>Split</th>
+          <th>TP targets</th>
+          <th>Net $</th>
+          <th>Net %</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="savedBody"></tbody>
+    </table>
+  </section>
 
-  <div id="tp-container"></div>
-  <div id="results" class="result"></div>
+<script>
+/* ---------- helpers ---------- */
+const $ = sel => document.querySelector(sel);
+const $$ = sel => [...document.querySelectorAll(sel)];
+const money = n => `$${(Math.round(n*100)/100).toFixed(2)}`;
+const pct   = n => `${(Math.round(n*100)/100).toFixed(2)}%`;
 
-  <script>
-    const tpContainer = document.getElementById("tp-container");
-    const numTPs = document.getElementById("numTPs");
-    const calcBtn = document.getElementById("calculate");
-    const results = document.getElementById("results");
+/* ---------- tabs ---------- */
+const tabs = $$('[data-tab]');
+tabs.forEach(a => a.addEventListener('click', (e)=>{
+  e.preventDefault();
+  tabs.forEach(t=>t.classList.remove('secondary'));
+  a.classList.add('secondary');
+  const id = a.getAttribute('href');
+  ['#calc','#saved'].forEach(s => $(s).hidden = (s!==id));
+  if (id==='#saved') renderSaved();
+}));
 
-    function renderTPInputs() {
-      tpContainer.innerHTML = "";
-      const n = parseInt(numTPs.value);
-      for (let i=1; i<=n; i++) {
-        const block = document.createElement("div");
-        block.className = "tp-block";
-        block.innerHTML = `
-          <h4>TP${i}</h4>
-          <label>Allocation (%)<input type="number" id="alloc${i}" min="0" max="100"/></label>
-          <label>Gain target (%)<input type="number" id="target${i}" min="0"/></label>
-        `;
-        tpContainer.appendChild(block);
-      }
-      tpContainer.className = "tp-grid";
-    }
+/* ---------- dynamic TP rows ---------- */
+const tpContainer = $('#tpContainer');
+const numTPs = $('#numTPs');
+function buildTP(idx, alloc= [25,35,10][idx] ?? 10, gain=[2,4,6][idx] ?? 2) {
+  const div = document.createElement('div');
+  div.className = 'tp-block';
+  div.innerHTML = `
+    <hgroup><h4>TP${idx+1}</h4><p class="muted">Closes a portion at TP${idx+1}.</p></hgroup>
+    <label>Allocation (%)
+      <input type="number" class="tp-alloc" value="${alloc}" min="0" step="0.5"/>
+    </label>
+    <label>Gain target (%)
+      <input type="number" class="tp-gain" value="${gain}" min="0" step="0.1"/>
+    </label>
+  `;
+  return div;
+}
+function renderTPs(){
+  tpContainer.innerHTML = '';
+  const count = parseInt(numTPs.value,10);
+  for (let i=0;i<count;i++) tpContainer.appendChild(buildTP(i));
+  updateAllocMsg();
+}
+numTPs.addEventListener('change', renderTPs);
 
-    function calculate() {
-      const n = parseInt(numTPs.value);
-      let allocSum = 0;
-      for (let i=1; i<=n; i++) {
-        allocSum += parseFloat(document.getElementById(`alloc${i}`).value || 0);
-      }
-      const remainder = 100 - allocSum;
-      results.textContent = `Current sum = ${allocSum.toFixed(2)}%. Remainder = ${remainder.toFixed(2)}% (stops at cap).`;
-      results.style.color = allocSum>100 ? "red" : "lightgreen";
-    }
+/* ---------- allocation hint ---------- */
+function readInputs(){
+  const size = parseFloat($('#tradeSize').value||'0');
+  const stop = Math.abs(parseFloat($('#stopCap').value||'0'));
+  const allocs = $$('.tp-alloc').map(x=>parseFloat(x.value||'0'));
+  const gains  = $$('.tp-gain').map(x=>parseFloat(x.value||'0'));
+  const sumAlloc = allocs.reduce((a,b)=>a+b,0);
+  const remainder = 100 - sumAlloc;
+  return {size, stop, allocs, gains, sumAlloc, remainder};
+}
+function updateAllocMsg(){
+  const {sumAlloc, remainder} = readInputs();
+  const el = $('#allocMsg');
+  el.textContent = sumAlloc>100
+    ? `Allocations exceed 100% by ${(sumAlloc-100).toFixed(2)}%. Reduce allocations.`
+    : `Current sum = ${sumAlloc.toFixed(2)}%. Remainder = ${Math.max(0,remainder).toFixed(2)}% (stops at cap).`;
+  el.className = sumAlloc>100 ? 'bad' : 'muted';
+}
 
-    numTPs.addEventListener("change", renderTPInputs);
-    calcBtn.addEventListener("click", calculate);
+/* ---------- calculation ---------- */
+const resultsCard = $('#resultsCard');
+const summaryEl = $('#summary');
+const detailBody = $('#detailBody');
+const gridBody = $('#gridBody');
+const saveBtn = $('#save');
 
-    renderTPInputs();
-  </script>
+function calculate(){
+  const {size, stop, allocs, gains, sumAlloc, remainder} = readInputs();
+  if(size<=0 || sumAlloc>100) { resultsCard.style.display='none'; saveBtn.disabled=true; return; }
+
+  const legs=[]; let total=0;
+  allocs.forEach((a,i)=>{
+    const portion = size*(a/100);
+    const profit  = portion*(gains[i]/100);
+    legs.push({label:`TP${i+1}`, alloc:a, target:gains[i], pnl:profit});
+    total += profit;
+  });
+  const remAlloc = Math.max(0,remainder);
+  const stopLoss = - size*(remAlloc/100)*(stop/100);
+  legs.push({label:'Remainder', alloc:remAlloc, target:-stop, pnl:stopLoss});
+  total += stopLoss;
+
+  const totalPct = (total/size)*100;
+  summaryEl.innerHTML =
+    `Net: <strong class="${total>=0?'good':'bad'}">${money(total)} (${pct(totalPct)})</strong> — ` +
+    `Trade ${money(size)}, Stop cap ${pct(stop)}.`;
+
+  detailBody.innerHTML = '';
+  legs.forEach(l=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${l.label}</td><td>${l.alloc.toFixed(2)}%</td><td>${l.label==='Remainder' ? 'Stop ' + pct(Math.abs(l.target)) : '+' + pct(l.target)}</td>
+                    <td class="${l.pnl>=0?'good':'bad'}">${money(l.pnl)}</td>`;
+    detailBody.appendChild(tr);
+  });
+
+  resultsCard.style.display='block';
+  saveBtn.disabled=false;
+
+  // refresh scenario grid if 2 TPs
+  regenGrid();
+  // return a data blob for saving
+  const split = allocs.join('/') + `/${Math.max(0,100-sumAlloc).toFixed(2)}`;
+  return { ts: Date.now(), size, stop, allocs, gains, remainder: Math.max(0,100-sumAlloc), legs, total, totalPct, split };
+}
+
+function regenGrid(){
+  const {size, stop, allocs, sumAlloc} = readInputs();
+  gridBody.innerHTML='';
+  if (allocs.length!==2){
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td colspan="5" class="muted">Scenario grid available for 2 TP setups only.</td>`;
+    gridBody.appendChild(tr);
+    return;
+  }
+  const remainder = Math.max(0,100 - sumAlloc);
+  const pairs = [[2,4],[3,5],[4,6],[5,7],[6,8],[7,9],[8,10]];
+  pairs.forEach(([tp1,tp2])=>{
+    const p1 = size*(allocs[0]/100)*(tp1/100);
+    const p2 = size*(allocs[1]/100)*(tp2/100);
+    const sl = -size*(remainder/100)*(stop/100);
+    const net = p1+p2+sl; const netPct=(net/size)*100;
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<td>${tp1}%</td><td>${tp2}%</td>
+      <td>${allocs[0].toFixed(0)} / ${allocs[1].toFixed(0)} / ${remainder.toFixed(0)}</td>
+      <td class="${net>=0?'good':'bad'}">${money(net)}</td>
+      <td class="${net>=0?'good':'bad'}">${pct(netPct)}</td>`;
+    gridBody.appendChild(tr);
+  });
+}
+
+/* ---------- presets ---------- */
+const setPreset = (a,b) => {
+  numTPs.value = 2; renderTPs();
+  const allocs = $$('.tp-alloc'); const gains = $$('.tp-gain');
+  allocs[0].value=a; allocs[1].value=b;
+  gains[0].value=2;  gains[1].value=4;
+  updateAllocMsg();
+}
+$('#preset602020').onclick = ()=> setPreset(60,20);
+$('#preset503020').onclick = ()=> setPreset(50,30);
+$('#preset403030').onclick = ()=> setPreset(40,30);
+$('#preset353530').onclick = ()=> setPreset(35,35);
+$('#preset303040').onclick = ()=> setPreset(30,30);
+$('#preset253540').onclick = ()=> setPreset(25,35);
+
+/* ---------- saving to localStorage ---------- */
+const KEY='tpCalcSaved';
+
+function loadSaved(){ try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return [] } }
+function saveSaved(list){ localStorage.setItem(KEY, JSON.stringify(list)); }
+
+function saveOutcome(){
+  const data = calculate(); // capture current result & ensure it’s fresh
+  if (!data) return;
+  const list = loadSaved();
+  list.unshift(data);
+  saveSaved(list);
+  // enable Saved tab view
+  renderSaved();
+  // switch to Saved tab automatically
+  document.querySelector('[href="#saved"]').click();
+}
+
+function renderSaved(){
+  const tbody = $('#savedBody');
+  const list = loadSaved();
+  tbody.innerHTML='';
+  if (!list.length){
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<td colspan="8" class="muted">No saved outcomes yet.</td>`;
+    tbody.appendChild(tr);
+    return;
+  }
+  list.forEach((it,idx)=>{
+    const when = new Date(it.ts).toLocaleString();
+    const split = (it.allocs||[]).join('/') + `/${it.remainder?.toFixed(2) ?? '0'}`;
+    const targets = (it.gains||[]).join('/');
+    const tr=document.createElement('tr');
+    tr.innerHTML = `
+      <td class="nowrap">${when}</td>
+      <td>${money(it.size)}</td>
+      <td>${pct(it.stop)}</td>
+      <td>${split}</td>
+      <td>${targets}</td>
+      <td class="${it.total>=0?'good':'bad'}">${money(it.total)}</td>
+      <td class="${it.total>=0?'good':'bad'}">${pct(it.totalPct)}</td>
+      <td><button class="secondary" data-del="${idx}">Delete</button></td>`;
+    tbody.appendChild(tr);
+  });
+  // attach deletes
+  $$('button[data-del]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const list = loadSaved();
+      list.splice(parseInt(btn.dataset.del,10),1);
+      saveSaved(list); renderSaved();
+    };
+  });
+}
+
+/* ---------- exports ---------- */
+$('#exportCSV').onclick = ()=>{
+  const list = loadSaved(); if (!list.length) return;
+  const header = ['date','trade','stop','split','targets','net_dollars','net_percent'];
+  const rows = list.map(it=>[
+    new Date(it.ts).toISOString(),
+    it.size,
+    it.stop,
+    (it.allocs||[]).join('/') + `/${it.remainder?.toFixed(2)??'0'}`,
+    (it.gains||[]).join('/'),
+    it.total,
+    it.totalPct
+  ]);
+  const csv = [header, ...rows].map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='tp-saved.csv'; a.click();
+};
+
+$('#exportJSON').onclick = ()=>{
+  const list = loadSaved(); if (!list.length) return;
+  const blob = new Blob([JSON.stringify(list,null,2)], {type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='tp-saved.json'; a.click();
+};
+
+$('#clearAll').onclick = ()=>{
+  if (confirm('Delete all saved outcomes on this device?')) {
+    localStorage.removeItem(KEY); renderSaved();
+  }
+};
+
+/* ---------- events ---------- */
+document.addEventListener('input', (e)=>{
+  if (e.target.matches('.tp-alloc,.tp-gain,#tradeSize,#stopCap')) updateAllocMsg();
+});
+$('#calculate').onclick = ()=> calculate();
+$('#regenGrid').onclick  = ()=> regenGrid();
+$('#save').onclick       = ()=> saveOutcome();
+
+/* ---------- init ---------- */
+renderTPs();
+updateAllocMsg();
+calculate();
+</script>
 </body>
 </html>
